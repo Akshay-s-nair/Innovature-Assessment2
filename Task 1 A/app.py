@@ -114,6 +114,12 @@ def signup():
 		return make_response('Successfully registered.', 201)
 	else:
 		return make_response('User already exists. Please Log in.', 202)
-
+		
+@app.route('/refresh', methods=['GET'])
+@token_required
+def refresh():
+    token = jwt.encode({'username': request.args.get('token'), 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)}, app.config['SECRET_KEY'])
+    return jsonify({'token': token.decode('UTF-8')}), 200
+	
 if __name__ == "__main__":
 	app.run(debug = True,port=5000)

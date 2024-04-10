@@ -1,101 +1,119 @@
-from flask import Flask, jsonify, request
+
+from flask import Flask, request, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
+import uuid 
+from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 from datetime import datetime, timedelta
 from functools import wraps
-import pytz
+
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'ritesh'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SECRET_KEY'] ="ashjvddsa1214331asdljh"
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///DataBase.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+
 db = SQLAlchemy(app)
-ist = pytz.timezone('Asia/Kolkata')
+app.app_context().push()
+
 
 class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(50), nullable=False)
+	id = db.Column(db.Integer, primary_key = True)
+	public_id = db.Column(db.String(50), unique = True)
+	name = db.Column(db.String(100))
+	email = db.Column(db.String(70), unique = True)
+	password = db.Column(db.String(80))
 
-def generate_token(username):
-    payload = {
-        'exp': datetime.now(ist) + timedelta(days=1),
-        'iat': datetime.now(ist),
-        'sub': username
-    }
-    token = jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
-    return token
 
 def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token:
-            return jsonify({'message': 'Token is missing!'}), 401
-        token = token.replace('Bearer ', '')
-        print('Received Token:', token)
-        try:
-            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-            print('Decoded Token:', data)
-            current_user = User.query.filter_by(username=data['sub']).first()
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Token has expired!'}), 401
-        except (jwt.InvalidTokenError, AttributeError):
-            return jsonify({'message': 'Invalid token!'}), 401
+	@wraps(f)
+	def decorated(*args, **kwargs):
+		token = None
+		if 'x-access-token' in request.headers:
+			token = request.headers['x-access-token']
+		if not token:
+			return jsonify({'message' : 'Token is missing !!'}), 401
 
-        if not current_user:
-            return jsonify({'message': 'User not found!'}), 401
+		try:
+			data = jwt.decode(token, app.config['SECRET_KEY'])
+			current_user = User.query\
+				.filter_by(public_id = data['public_id'])\
+				.first()
+		except:
+			return jsonify({
+				'message' : 'Token is invalid !!'
+			}), 401
+		return f(current_user, *args, **kwargs)
 
-        return f(current_user, *args, **kwargs)
+	return decorated
 
-    return decorated
-
-@app.route('/', methods=['GET'])
-def show_routes():
-    routes = []
-    for rule in app.url_map.iter_rules():
-        if rule.endpoint != 'static':
-            routes.append({'endpoint': rule.endpoint, 'methods': ','.join(rule.methods), 'path': str(rule)})
-    return jsonify({'routes': routes})
-
-@app.route('/register', methods=['POST'])
-def register():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-
-    if not username or not password:
-        return jsonify({'message': 'Username and password are required!'}), 400
-
-    if User.query.filter_by(username=username).first():
-        return jsonify({'message': 'Username already exists!'}), 400
-
-    new_user = User(username=username, password=password)
-    db.session.add(new_user)
-    db.session.commit()
-
-    token = generate_token(username)
-
-    return jsonify({'message': 'User registered successfully', 'token': token})
-
-@app.route('/login', methods=['POST'])
-def login():
-    auth = request.authorization
-    if not auth or not auth.username or not auth.password:
-        return jsonify({'message': 'Username and password are required!'}), 401
-
-    user = User.query.filter_by(username=auth.username).first()
-    if not user or user.password != auth.password:
-        return jsonify({'message': 'Invalid credentials!'}), 401
-
-    token = generate_token(user.username)
-    return jsonify({'message': 'User is now logged in', 'token': token})
-
-@app.route('/refresh_token', methods=['POST'])
+@app.route('/getuser', methods =['GET'])
 @token_required
-def refresh_token(current_user):
-    token = generate_token(current_user.username)
-    return jsonify({'token': token})
+def get_all_users(current_user):
+	users = User.query.all()
+	output = []
+	for user in users:
+		output.append({
+			'public_id': user.public_id,
+			'name' : user.name,
+			'email' : user.email
+		})
 
-if __name__ == '__main__':
-    db.create_all()
-    app.run(debug=True)
+	return jsonify({'users': output})
+
+
+@app.route('/login', methods =['POST'])
+def login():
+	auth = request.form
+	if not auth or not auth.get('email') or not auth.get('password'):
+		return make_response(
+			'Could not verify',
+			401,
+			{'WWW-Authenticate' : 'Basic realm ="Login required !!"'}
+		)
+
+	user = User.query.filter_by(email = auth.get('email')).first()
+
+	if not user:
+		return make_response(
+			'Could not verify',
+			401,
+			{'WWW-Authenticate' : 'Basic realm ="User does not exist !!"'}
+		)
+
+	if check_password_hash(user.password, auth.get('password')):
+		token = jwt.encode({
+			'public_id': user.public_id,
+			'exp' : datetime.utcnow() + timedelta(minutes = 30)
+		}, app.config['SECRET_KEY'])
+
+		return make_response(jsonify({'token' : token.decode('UTF-8')}), 201)
+	return make_response(
+		'Could not verify',
+		403,
+		{'WWW-Authenticate' : 'Basic realm ="Wrong Password !!"'}
+	)
+
+
+@app.route('/register', methods =['POST'])
+def signup():
+	data = request.form
+	name, email = data.get('name'), data.get('email')
+	password = data.get('password')
+	user = User.query.filter_by(email = email).first()
+	if not user:
+		user = User(
+			public_id = str(uuid.uuid4()),
+			name = name,
+			email = email,
+			password = generate_password_hash(password)
+		)
+		db.session.add(user)
+		db.session.commit()
+		return make_response('Successfully registered.', 201)
+	else:
+		return make_response('User already exists. Please Log in.', 202)
+
+if __name__ == "__main__":
+	app.run(debug = True,port=5000)

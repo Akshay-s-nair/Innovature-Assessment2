@@ -2,19 +2,19 @@
 
 ### Task 1
 
-#### User Authentication with JWT:
+#### A - User Authentication with JWT:
 - Develop a user authentication system using JWT (JSON Web Tokens) in Python.
 - Create endpoints for user registration, login, and token refresh using frameworks like Flask or Django.
 - Use libraries like PyJWT for token generation and verification.
 - Secure API endpoints using JWT-based authentication middleware.
 
-#### Simple CRUD API:
+#### B - Simple CRUD API:
 - Implement a simple CRUD (Create, Read, Update, Delete) API for managing a resource (e.g., users, products, tasks) in Python.
 - Utilize frameworks like Flask or Django for building RESTful APIs.
 - Define routes, views, and models for handling CRUD operations.
 - Integrate with a database (e.g., SQLite, PostgreSQL) for data storage.
 
-#### File Upload and Download API:
+#### C - File Upload and Download API:
 - Create an API for uploading and downloading files in Python.
 - Implement endpoints for uploading files and generating download links using frameworks like Flask or Django.
 - Use libraries like Flask-Uploads or Django file handling for handling file uploads.

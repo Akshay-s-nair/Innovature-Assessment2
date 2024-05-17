@@ -5,9 +5,7 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tasks.db'
 db = SQLAlchemy(app)
 
-
-"""ORM named CRUD used for the creation of a table for doing Todo CRUD operations."""
-class CRUD(db.Model):
+class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
@@ -23,7 +21,7 @@ def show_routes():
 
 @app.route('/tasks', methods=['GET'])
 def get_tasks():
-    tasks = CRUD.query.all()
+    tasks = Task.query.all()
     tasks_list = []
     for task in tasks:
         tasks_list.append({
@@ -37,14 +35,14 @@ def get_tasks():
 @app.route('/tasks', methods=['POST'])
 def create_task():
     data = request.json
-    new_task = CRUD(title=data['title'], description=data.get('description', ''), done=data.get('done', False))
+    new_task = Task(title=data['title'], description=data.get('description', ''), done=data.get('done', False))
     db.session.add(new_task)
     db.session.commit()
     return jsonify({'message': 'Task created successfully'})
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
 def get_task(task_id):
-    task = CRUD.query.get_or_404(task_id)
+    task = Task.query.get_or_404(task_id)
     return jsonify({
         'id': task.id,
         'title': task.title,
@@ -54,7 +52,7 @@ def get_task(task_id):
 
 @app.route('/tasks/<int:task_id>', methods=['PUT'])
 def update_task(task_id):
-    task = CRUD.query.get_or_404(task_id)
+    task = Task.query.get_or_404(task_id)
     data = request.json
     task.title = data.get('title', task.title)
     task.description = data.get('description', task.description)
@@ -64,7 +62,7 @@ def update_task(task_id):
 
 @app.route('/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
-    task = CRUD.query.get_or_404(task_id)
+    task = Task.query.get_or_404(task_id)
     db.session.delete(task)
     db.session.commit()
     return jsonify({'message': 'Task deleted successfully'})
